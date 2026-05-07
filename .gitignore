@@ -1,0 +1,18 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+
+# Environment files
+.env
+
+# Generated index artifacts
+data/index/*.npz
+
+# OS / editor
+.DS_Store
+.vscode/
