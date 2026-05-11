@@ -73,7 +73,7 @@ function displayResults(results) {
         const filename = result.path.split(/[\/\\]/).pop();
 
         card.innerHTML = `
-            <img src="${result.url}" alt="${filename}" class="result-image" loading="lazy">
+            <img src="${result.url}" alt="${filename}" class="result-image" loading="lazy" onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\\\'http://www.w3.org/2000/svg\\\' width=\\\'100%\\\' height=\\\'100%\\\' viewBox=\\\'0 0 100 100\\\'><rect width=\\\'100%\\\' height=\\\'100%\\\' fill=\\\'%2318181b\\\'/><text x=\\\'50%\\\' y=\\\'50%\\\' fill=\\\'%23a1a1aa\\\' font-family=\\\'sans-serif\\\' font-size=\\\'10\\\' text-anchor=\\\'middle\\\' dominant-baseline=\\\'middle\\\'>Image Missing</text></svg>';">
             <div class="result-info">
                 <span class="filename" title="${filename}">${filename}</span>
                 <span class="similarity-score">${similarityPercentage}%</span>

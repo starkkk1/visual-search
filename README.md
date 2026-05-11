@@ -4,10 +4,11 @@ This is an image search project that lets you:
 - index a folder of images into vector embeddings
 - query with an image and retrieve the most similar images
 
-It now supports three embedding modes:
+It now supports four embedding modes:
 - `histogram` (fast baseline)
 - `cnn_resnet50` (CNN features)
 - `swin_tiny` (Swin Transformer features)
+- `clip` (OpenAI CLIP ViT-B/32 features)
 
 ## Project Structure
 
@@ -59,6 +60,7 @@ Use deep models:
 ```bash
 python -m src.cli index --method cnn_resnet50
 python -m src.cli index --method swin_tiny
+python -m src.cli index --method clip
 ```
 
 ### 3) Search

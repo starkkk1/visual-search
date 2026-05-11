@@ -60,6 +60,7 @@ def _load_timm_model(method: EmbeddingMethod):
 
     if torch.cuda.is_available():
         device = "cuda"
+        torch.backends.cudnn.benchmark = True
     elif torch.backends.mps.is_available():
         device = "mps"
     else:
@@ -82,6 +83,7 @@ def _load_clip_model():
 
     if torch.cuda.is_available():
         device = "cuda"
+        torch.backends.cudnn.benchmark = True
     elif torch.backends.mps.is_available():
         device = "mps"
     else:
@@ -102,7 +104,8 @@ def _extract_clip_embedding(image_path: Path) -> np.ndarray:
         rgb = img.convert("RGB")
 
     inputs = processor(images=rgb, return_tensors="pt").to(device)
-    with torch.no_grad():
+    autocast_device = "cuda" if device == "cuda" else "cpu"
+    with torch.no_grad(), torch.autocast(device_type=autocast_device, enabled=device == "cuda", dtype=torch.float16):
         outputs = model(pixel_values=inputs["pixel_values"])
         vec = outputs.image_embeds
 
@@ -131,7 +134,8 @@ def _extract_clip_embeddings_batch(image_paths: list[Path]) -> tuple[np.ndarray,
         return np.array([]), []
 
     inputs = processor(images=images, return_tensors="pt").to(device)
-    with torch.no_grad():
+    autocast_device = "cuda" if device == "cuda" else "cpu"
+    with torch.no_grad(), torch.autocast(device_type=autocast_device, enabled=device == "cuda", dtype=torch.float16):
         outputs = model(pixel_values=inputs["pixel_values"])
         vecs = outputs.image_embeds
 
@@ -152,7 +156,8 @@ def _extract_deep_embedding(image_path: Path, method: EmbeddingMethod) -> np.nda
         rgb = img.convert("RGB")
 
     input_tensor = transform(rgb).unsqueeze(0).to(device)
-    with torch.no_grad():
+    autocast_device = "cuda" if device.type == "cuda" else "cpu"
+    with torch.no_grad(), torch.autocast(device_type=autocast_device, enabled=device.type == "cuda", dtype=torch.float16):
         vec = model(input_tensor)
 
     arr = vec.squeeze(0).detach().cpu().numpy().astype(np.float32)
@@ -183,7 +188,8 @@ def _extract_deep_embeddings_batch(image_paths: list[Path], method: EmbeddingMet
         return np.array([]), []
 
     input_tensor = torch.stack(tensors).to(device)
-    with torch.no_grad():
+    autocast_device = "cuda" if device.type == "cuda" else "cpu"
+    with torch.no_grad(), torch.autocast(device_type=autocast_device, enabled=device.type == "cuda", dtype=torch.float16):
         vecs = model(input_tensor)
 
     arrs = vecs.detach().cpu().numpy().astype(np.float32)

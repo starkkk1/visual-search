@@ -62,5 +62,6 @@ async def search(image: UploadFile = File(...)):
         if tmp_path.exists():
             os.remove(tmp_path)
 
+IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/images", StaticFiles(directory=IMAGES_DIR), name="images")
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

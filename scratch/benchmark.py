@@ -14,9 +14,11 @@ def get_class(path: Path) -> str:
     # Extracts 'ashmolean' from 'ashmolean_000000.jpg'
     return path.stem.rsplit('_', 1)[0]
 
+from src.config import DATA_DIR, IMAGES_DIR
+
 def setup_small_dataset():
-    images_dir = Path("data/images")
-    small_dir = Path("data/images_small")
+    images_dir = IMAGES_DIR
+    small_dir = DATA_DIR / "images_small"
     small_dir.mkdir(parents=True, exist_ok=True)
     
     # Grab images from 5 different classes (20 per class) to ensure diversity
@@ -56,10 +58,10 @@ def main():
     small_dir, queries = setup_small_dataset()
     
     indices = {
-        "histogram": Path("data/images_small/index_hist_bench.npz"),
-        "cnn_resnet50": Path("data/images_small/index_cnn_bench.npz"),
-        "swin_tiny": Path("data/images_small/index_swin_bench.npz"),
-        "clip": Path("data/images_small/index_clip_bench.npz")
+        "histogram": small_dir / "index_hist_bench.npz",
+        "cnn_resnet50": small_dir / "index_cnn_bench.npz",
+        "swin_tiny": small_dir / "index_swin_bench.npz",
+        "clip": small_dir / "index_clip_bench.npz"
     }
     
     print("\nBuilding indices...")
