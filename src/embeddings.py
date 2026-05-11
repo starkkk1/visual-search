@@ -10,17 +10,20 @@ from PIL import Image
 
 HIST_BINS = 8
 HISTOGRAM_EMBEDDING_SIZE = HIST_BINS * HIST_BINS * HIST_BINS
-EmbeddingMethod = Literal["histogram", "cnn_resnet50", "swin_tiny"]
+EmbeddingMethod = Literal["histogram", "cnn_resnet50", "swin_tiny", "clip"]
 SUPPORTED_METHODS: tuple[EmbeddingMethod, ...] = (
     "histogram",
     "cnn_resnet50",
     "swin_tiny",
+    "clip",
 )
 
 
 def get_embedding_size(method: EmbeddingMethod) -> int:
     if method == "histogram":
         return HISTOGRAM_EMBEDDING_SIZE
+    if method == "clip":
+        return 512
     if method in {"cnn_resnet50", "swin_tiny"}:
         model, _ = _load_timm_model(method)
         feature_dim = getattr(model, "num_features", None)
@@ -70,6 +73,73 @@ def _load_timm_model(method: EmbeddingMethod):
     data_config = timm.data.resolve_model_data_config(model)
     transform = timm.data.create_transform(**data_config, is_training=False)
     return model, transform
+
+
+@lru_cache(maxsize=1)
+def _load_clip_model():
+    from transformers import CLIPProcessor, CLIPVisionModelWithProjection
+    import torch
+
+    if torch.cuda.is_available():
+        device = "cuda"
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
+
+    model_name = "openai/clip-vit-base-patch32"
+    model = CLIPVisionModelWithProjection.from_pretrained(model_name).to(device)
+    model.eval()
+    processor = CLIPProcessor.from_pretrained(model_name)
+    return model, processor, device
+
+
+def _extract_clip_embedding(image_path: Path) -> np.ndarray:
+    import torch
+    model, processor, device = _load_clip_model()
+
+    with Image.open(image_path) as img:
+        rgb = img.convert("RGB")
+
+    inputs = processor(images=rgb, return_tensors="pt").to(device)
+    with torch.no_grad():
+        outputs = model(pixel_values=inputs["pixel_values"])
+        vec = outputs.image_embeds
+
+    arr = vec.squeeze(0).detach().cpu().numpy().astype(np.float32)
+    norm = np.linalg.norm(arr)
+    if norm > 0:
+        arr /= norm
+    return arr
+
+
+def _extract_clip_embeddings_batch(image_paths: list[Path]) -> tuple[np.ndarray, list[Path]]:
+    import torch
+    model, processor, device = _load_clip_model()
+
+    images = []
+    valid_paths = []
+    for image_path in image_paths:
+        try:
+            with Image.open(image_path) as img:
+                images.append(img.convert("RGB"))
+            valid_paths.append(image_path)
+        except Exception as e:
+            print(f"Warning: Skipping corrupted image {image_path}: {e}")
+
+    if not images:
+        return np.array([]), []
+
+    inputs = processor(images=images, return_tensors="pt").to(device)
+    with torch.no_grad():
+        outputs = model(pixel_values=inputs["pixel_values"])
+        vecs = outputs.image_embeds
+
+    arrs = vecs.detach().cpu().numpy().astype(np.float32)
+    norms = np.linalg.norm(arrs, axis=1, keepdims=True)
+    norms[norms == 0] = 1.0
+    arrs /= norms
+    return arrs, valid_paths
 
 
 def _extract_deep_embedding(image_path: Path, method: EmbeddingMethod) -> np.ndarray:
@@ -127,6 +197,8 @@ def extract_embedding(image_path: Path, method: EmbeddingMethod = "histogram") -
     """Extract an embedding for an image using the selected method."""
     if method == "histogram":
         return _extract_histogram_embedding(image_path)
+    if method == "clip":
+        return _extract_clip_embedding(image_path)
     if method in {"cnn_resnet50", "swin_tiny"}:
         return _extract_deep_embedding(image_path, method)
     raise ValueError(f"Unsupported embedding method: {method}")
@@ -146,6 +218,8 @@ def extract_embeddings_batch(image_paths: list[Path], method: EmbeddingMethod = 
         if not vecs:
             return np.array([]), []
         return np.vstack(vecs), valid_paths
+    if method == "clip":
+        return _extract_clip_embeddings_batch(image_paths)
     if method in {"cnn_resnet50", "swin_tiny"}:
         return _extract_deep_embeddings_batch(image_paths, method)
     raise ValueError(f"Unsupported embedding method: {method}")

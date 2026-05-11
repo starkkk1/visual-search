@@ -20,7 +20,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--method",
         choices=SUPPORTED_METHODS,
         default="histogram",
-        help="Embedding method: histogram, cnn_resnet50, or swin_tiny",
+        help="Embedding method: histogram, cnn_resnet50, swin_tiny, or clip",
     )
 
     search_parser = subparsers.add_parser("search", help="Search similar images")

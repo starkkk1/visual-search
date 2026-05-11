@@ -63,11 +63,32 @@ python -m src.cli index --method swin_tiny
 
 ### 3) Search
 
+**Standard Search:**
+
 ```bash
 python -m src.cli search --query data/images/example.jpg --top-k 5
 ```
 
 Search automatically uses the embedding method saved in the index.
+
+**Hybrid Search (ResNet50 + Swin):**
+
+To use hybrid search, first build two separate indexes using the deep models:
+
+```bash
+python -m src.cli index --method cnn_resnet50 --index-file data/index_cnn.npz
+python -m src.cli index --method swin_tiny --index-file data/index_swin.npz
+```
+
+Then trigger the hybrid search by passing both indexes to the search command. You can optionally use the `--alpha` flag to adjust the weight between the two models (defaults to 0.5):
+
+```bash
+python -m src.cli search --query data/images/example.jpg \
+  --index-file data/index_cnn.npz \
+  --index-swin data/index_swin.npz \
+  --alpha 0.5 \
+  --top-k 5
+```
 
 ### 4) Web Interface (New)
 
