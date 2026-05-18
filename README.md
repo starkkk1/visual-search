@@ -1,10 +1,12 @@
 # Image Search System (Starter)
 
 This is an image search project that lets you:
+
 - index a folder of images into vector embeddings
 - query with an image and retrieve the most similar images
 
 It now supports four embedding modes:
+
 - `histogram` (fast baseline)
 - `cnn_resnet50` (CNN features)
 - `swin_tiny` (Swin Transformer features)
