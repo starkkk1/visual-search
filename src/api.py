@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .config import IMAGES_DIR, INDEX_FILE, PROJECT_ROOT
+from .config import DEFAULT_COLLECTION, IMAGES_DIR, PROJECT_ROOT
 from .search import search_similar
 
 app = FastAPI(title="Image Search API")
@@ -38,12 +38,11 @@ async def search(image: UploadFile = File(...)):
         tmp_path = Path(tmp.name)
 
     try:
-        # Using the standard search, which pulls the method from the index file metadata.
-        # This keeps the hybrid or method complexity backstage.
+        # Using the standard search, which targets the DEFAULT_COLLECTION
         results = search_similar(
             query_image=tmp_path,
             images_dir=IMAGES_DIR,
-            index_file=INDEX_FILE,
+            collection_name=DEFAULT_COLLECTION,
             top_k=20,
         )
         

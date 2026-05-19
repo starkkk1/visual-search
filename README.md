@@ -17,7 +17,7 @@ It now supports four embedding modes:
 ```
 data/
   images/          # put your dataset images here
-  index/           # generated index file is stored here
+  qdrant/          # Qdrant vector database is stored here
 visual-search/
   src/
     config.py
@@ -54,7 +54,7 @@ python -m src.cli index
 Optional:
 
 ```bash
-python -m src.cli index --images ../data/images --index-file ../data/index/image_index.npz
+python -m src.cli index --images ../data/images --method clip
 ```
 
 Use deep models:
@@ -73,23 +73,26 @@ python -m src.cli index --method clip
 python -m src.cli search --query ../data/images/example.jpg --top-k 5
 ```
 
-Search automatically uses the embedding method saved in the index.
+Search uses the `histogram` collection by default. You can specify a different one:
+
+```bash
+python -m src.cli search --query ../data/images/example.jpg --collection clip --top-k 5
+```
 
 **Hybrid Search (ResNet50 + Swin):**
 
-To use hybrid search, first build two separate indexes using the deep models:
+To use hybrid search, first build two separate indexes into their respective collections:
 
 ```bash
-python -m src.cli index --method cnn_resnet50 --index-file ../data/index_cnn.npz
-python -m src.cli index --method swin_tiny --index-file ../data/index_swin.npz
+python -m src.cli index --method cnn_resnet50
+python -m src.cli index --method swin_tiny
 ```
 
-Then trigger the hybrid search by passing both indexes to the search command. You can optionally use the `--alpha` flag to adjust the weight between the two models (defaults to 0.5):
+Then trigger the hybrid search using the `--hybrid` flag. You can optionally use the `--alpha` flag to adjust the weight between the two models (defaults to 0.5):
 
 ```bash
 python -m src.cli search --query ../data/images/example.jpg \
-  --index-file ../data/index_cnn.npz \
-  --index-swin ../data/index_swin.npz \
+  --hybrid \
   --alpha 0.5 \
   --top-k 5
 ```
@@ -109,10 +112,10 @@ Then, open your web browser and navigate to: **http://localhost:8000**
 ## Notes
 
 - Supported extensions: `.jpg`, `.jpeg`, `.png`, `.bmp`, `.webp`
-- The index is saved as a compressed NumPy file (`.npz`)
+- The index is now stored locally in a **Qdrant Vector Database**
 - Similarity is cosine similarity in range approximately `[0, 1]`
 - First run with CNN/Swin downloads pretrained weights from the internet
 - Ongoing project changes are tracked in [CHANGELOG.md](CHANGELOG.md)
 
-- Migrate index to Qdrant Vector Database
-- Store index metadata in SQLite for filtering and tags
+- [x] Migrate index to Qdrant Vector Database
+- [ ] Store index metadata in SQLite for filtering and tags
