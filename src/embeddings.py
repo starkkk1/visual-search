@@ -10,11 +10,9 @@ from PIL import Image
 
 HIST_BINS = 8
 HISTOGRAM_EMBEDDING_SIZE = HIST_BINS * HIST_BINS * HIST_BINS
-EmbeddingMethod = Literal["histogram", "cnn_resnet50", "swin_tiny", "clip"]
+EmbeddingMethod = Literal["histogram", "clip"]
 SUPPORTED_METHODS: tuple[EmbeddingMethod, ...] = (
     "histogram",
-    "cnn_resnet50",
-    "swin_tiny",
     "clip",
 )
 
@@ -24,12 +22,6 @@ def get_embedding_size(method: EmbeddingMethod) -> int:
         return HISTOGRAM_EMBEDDING_SIZE
     if method == "clip":
         return 512
-    if method in {"cnn_resnet50", "swin_tiny"}:
-        model, _ = _load_timm_model(method)
-        feature_dim = getattr(model, "num_features", None)
-        if feature_dim is None:
-            raise RuntimeError(f"Could not read feature dimension for model: {method}")
-        return int(feature_dim)
     raise ValueError(f"Unsupported embedding method: {method}")
 
 
@@ -50,30 +42,6 @@ def _extract_histogram_embedding(image_path: Path) -> np.ndarray:
     if norm > 0:
         vec /= norm
     return vec
-
-
-@lru_cache(maxsize=2)
-def _load_timm_model(method: EmbeddingMethod):
-    # Lazy import keeps the baseline path lightweight for users who only need histogram mode.
-    import timm
-    import torch
-
-    if torch.cuda.is_available():
-        device = "cuda"
-        torch.backends.cudnn.benchmark = True
-    elif torch.backends.mps.is_available():
-        device = "mps"
-    else:
-        device = "cpu"
-
-    model_name = "resnet50" if method == "cnn_resnet50" else "swin_tiny_patch4_window7_224"
-    model = timm.create_model(model_name, pretrained=True, num_classes=0)
-    model.eval()
-    model.to(device)
-
-    data_config = timm.data.resolve_model_data_config(model)
-    transform = timm.data.create_transform(**data_config, is_training=False)
-    return model, transform
 
 
 @lru_cache(maxsize=1)
@@ -146,67 +114,12 @@ def _extract_clip_embeddings_batch(image_paths: list[Path]) -> tuple[np.ndarray,
     return arrs, valid_paths
 
 
-def _extract_deep_embedding(image_path: Path, method: EmbeddingMethod) -> np.ndarray:
-    import torch
-
-    model, transform = _load_timm_model(method)
-    device = next(model.parameters()).device
-
-    with Image.open(image_path) as img:
-        rgb = img.convert("RGB")
-
-    input_tensor = transform(rgb).unsqueeze(0).to(device)
-    autocast_device = "cuda" if device.type == "cuda" else "cpu"
-    with torch.no_grad(), torch.autocast(device_type=autocast_device, enabled=device.type == "cuda", dtype=torch.float16):
-        vec = model(input_tensor)
-
-    arr = vec.squeeze(0).detach().cpu().numpy().astype(np.float32)
-    norm = np.linalg.norm(arr)
-    if norm > 0:
-        arr /= norm
-    return arr
-
-
-def _extract_deep_embeddings_batch(image_paths: list[Path], method: EmbeddingMethod) -> tuple[np.ndarray, list[Path]]:
-    import torch
-
-    model, transform = _load_timm_model(method)
-    device = next(model.parameters()).device
-
-    tensors = []
-    valid_paths = []
-    for image_path in image_paths:
-        try:
-            with Image.open(image_path) as img:
-                rgb = img.convert("RGB")
-            tensors.append(transform(rgb))
-            valid_paths.append(image_path)
-        except Exception as e:
-            print(f"Warning: Skipping corrupted image {image_path}: {e}")
-
-    if not tensors:
-        return np.array([]), []
-
-    input_tensor = torch.stack(tensors).to(device)
-    autocast_device = "cuda" if device.type == "cuda" else "cpu"
-    with torch.no_grad(), torch.autocast(device_type=autocast_device, enabled=device.type == "cuda", dtype=torch.float16):
-        vecs = model(input_tensor)
-
-    arrs = vecs.detach().cpu().numpy().astype(np.float32)
-    norms = np.linalg.norm(arrs, axis=1, keepdims=True)
-    norms[norms == 0] = 1.0
-    arrs /= norms
-    return arrs, valid_paths
-
-
 def extract_embedding(image_path: Path, method: EmbeddingMethod = "histogram") -> np.ndarray:
     """Extract an embedding for an image using the selected method."""
     if method == "histogram":
         return _extract_histogram_embedding(image_path)
     if method == "clip":
         return _extract_clip_embedding(image_path)
-    if method in {"cnn_resnet50", "swin_tiny"}:
-        return _extract_deep_embedding(image_path, method)
     raise ValueError(f"Unsupported embedding method: {method}")
 
 
@@ -226,6 +139,4 @@ def extract_embeddings_batch(image_paths: list[Path], method: EmbeddingMethod = 
         return np.vstack(vecs), valid_paths
     if method == "clip":
         return _extract_clip_embeddings_batch(image_paths)
-    if method in {"cnn_resnet50", "swin_tiny"}:
-        return _extract_deep_embeddings_batch(image_paths, method)
     raise ValueError(f"Unsupported embedding method: {method}")

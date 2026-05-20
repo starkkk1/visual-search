@@ -1,20 +1,18 @@
 import sys
 import time
 import shutil
-import numpy as np
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
 from src.embeddings import SUPPORTED_METHODS, extract_embedding
 from src.indexer import build_index
-from src.search import search_similar, hybrid_search_similar
+from src.search import search_similar
+from src.config import DATA_DIR, IMAGES_DIR
 
 def get_class(path: Path) -> str:
     # Extracts 'ashmolean' from 'ashmolean_000000.jpg'
     return path.stem.rsplit('_', 1)[0]
-
-from src.config import DATA_DIR, IMAGES_DIR
 
 def setup_small_dataset():
     images_dir = IMAGES_DIR
@@ -57,18 +55,16 @@ def main():
     print("Setting up small dataset for benchmark...")
     small_dir, queries = setup_small_dataset()
     
-    indices = {
-        "histogram": small_dir / "index_hist_bench.npz",
-        "cnn_resnet50": small_dir / "index_cnn_bench.npz",
-        "swin_tiny": small_dir / "index_swin_bench.npz",
-        "clip": small_dir / "index_clip_bench.npz"
-    }
+    methods = ["histogram", "clip"]
     
     print("\nBuilding indices...")
-    for method, index_path in indices.items():
-        if not index_path.exists():
-            print(f"Building {method} index...")
-            build_index(small_dir, index_path, method)
+    for method in methods:
+        print(f"Building {method} index...")
+        build_index(
+            images_dir=small_dir,
+            collection_name=f"{method}_bench",
+            method=method,
+        )
     
     # Warmup
     print("\nWarming up models...")
@@ -103,19 +99,17 @@ def main():
         print(f"{method_name:<15} | {avg_time:.4f} secs/query | {avg_precision*100:>5.1f}%")
     
     # Standalone benchmarks
-    for method, index_path in indices.items():
+    for method in methods:
         evaluate(
             method,
-            lambda q: search_similar(q, small_dir, index_path, top_k=5)
+            lambda q, m=method: search_similar(
+                query_image=q,
+                images_dir=small_dir,
+                collection_name=f"{m}_bench",
+                top_k=5
+            )
         )
         
-    # Hybrid benchmark
-    evaluate(
-        "hybrid",
-        lambda q: hybrid_search_similar(
-            q, small_dir, indices["cnn_resnet50"], indices["swin_tiny"], alpha=0.5, top_k=5
-        )
-    )
     print("-" * 65)
     
 if __name__ == "__main__":

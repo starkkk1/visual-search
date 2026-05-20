@@ -5,11 +5,9 @@ This is an image search project that lets you:
 - index a folder of images into vector embeddings
 - query with an image and retrieve the most similar images
 
-It now supports four embedding modes:
+It now supports two embedding modes:
 
 - `histogram` (fast baseline)
-- `cnn_resnet50` (CNN features)
-- `swin_tiny` (Swin Transformer features)
 - `clip` (OpenAI CLIP ViT-B/32 features)
 
 ## Project Structure
@@ -57,11 +55,9 @@ Optional:
 python -m src.cli index --images ../data/images --method clip
 ```
 
-Use deep models:
+Use the CLIP model:
 
 ```bash
-python -m src.cli index --method cnn_resnet50
-python -m src.cli index --method swin_tiny
 python -m src.cli index --method clip
 ```
 
@@ -79,23 +75,6 @@ Search uses the `histogram` collection by default. You can specify a different o
 python -m src.cli search --query ../data/images/example.jpg --collection clip --top-k 5
 ```
 
-**Hybrid Search (ResNet50 + Swin):**
-
-To use hybrid search, first build two separate indexes into their respective collections:
-
-```bash
-python -m src.cli index --method cnn_resnet50
-python -m src.cli index --method swin_tiny
-```
-
-Then trigger the hybrid search using the `--hybrid` flag. You can optionally use the `--alpha` flag to adjust the weight between the two models (defaults to 0.5):
-
-```bash
-python -m src.cli search --query ../data/images/example.jpg \
-  --hybrid \
-  --alpha 0.5 \
-  --top-k 5
-```
 
 ### 4) Web Interface (New)
 
@@ -114,7 +93,7 @@ Then, open your web browser and navigate to: **http://localhost:8000**
 - Supported extensions: `.jpg`, `.jpeg`, `.png`, `.bmp`, `.webp`
 - The index is now stored locally in a **Qdrant Vector Database**
 - Similarity is cosine similarity in range approximately `[0, 1]`
-- First run with CNN/Swin downloads pretrained weights from the internet
+- First run with CLIP downloads pretrained weights from the internet
 - Ongoing project changes are tracked in [CHANGELOG.md](CHANGELOG.md)
 
 - [x] Migrate index to Qdrant Vector Database
