@@ -23,7 +23,14 @@ def build_index(
     method: EmbeddingMethod = "histogram",
     batch_size: int = 32,
 ) -> int:
-    image_paths = sorted(path for path in images_dir.rglob("*") if _is_image(path))
+    print(f"Scanning directory {images_dir} for images...")
+    image_paths = []
+    for path in tqdm(images_dir.rglob("*"), desc="Scanning files"):
+        if _is_image(path):
+            image_paths.append(path)
+    
+    print(f"Found {len(image_paths)} valid images. Sorting paths...")
+    image_paths.sort()
     if not image_paths:
         raise ValueError(f"No images found in {images_dir}")
 

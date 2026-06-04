@@ -17,3 +17,13 @@ data/index/*.npz
 # OS / editor
 .DS_Store
 .vscode/
+
+# Node.js
+node_modules/
+package-lock.json
+
+.mongodb_data/
+.qdrant_data/
+*.pt
+*.pth
+*.h5

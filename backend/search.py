@@ -21,14 +21,14 @@ def search_similar(
     method = cast(EmbeddingMethod, collection_name)
     query_vec = extract_embedding(query_image, method=method)
 
-    search_result = client.search(
+    search_result = client.query_points(
         collection_name=collection_name,
-        query_vector=query_vec.tolist(),
+        query=query_vec.tolist(),
         limit=top_k,
     )
 
     results: list[tuple[str, float]] = []
-    for point in search_result:
+    for point in search_result.points:
         if point.payload and "path" in point.payload:
             image_rel_path = point.payload["path"]
             image_abs_path = str(images_dir / image_rel_path)

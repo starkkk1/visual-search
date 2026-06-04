@@ -22,7 +22,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-STATIC_DIR = PROJECT_ROOT / "src" / "static"
+STATIC_DIR = PROJECT_ROOT / "backend" / "static"
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
 
 class SearchResult(BaseModel):
