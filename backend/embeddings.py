@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import torch
+if not hasattr(torch, "float8_e8m0fnu"):
+    setattr(torch, "float8_e8m0fnu", torch.float32)
+
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -62,6 +66,44 @@ def _load_clip_model():
     model.eval()
     processor = CLIPProcessor.from_pretrained(model_name)
     return model, processor, device
+
+
+@lru_cache(maxsize=1)
+def _load_clip_text_model():
+    from transformers import CLIPTokenizer, CLIPTextModelWithProjection
+    import torch
+
+    if torch.cuda.is_available():
+        device = "cuda"
+        torch.backends.cudnn.benchmark = True
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
+
+    model_name = "openai/clip-vit-base-patch32"
+    model = CLIPTextModelWithProjection.from_pretrained(model_name).to(device)
+    model.eval()
+    tokenizer = CLIPTokenizer.from_pretrained(model_name)
+    return model, tokenizer, device
+
+
+def extract_clip_text_embedding(text: str) -> np.ndarray:
+    """Extract an embedding for a text query using the CLIP text encoder."""
+    import torch
+    model, tokenizer, device = _load_clip_text_model()
+
+    inputs = tokenizer([text], padding=True, return_tensors="pt").to(device)
+    autocast_device = "cuda" if device == "cuda" else "cpu"
+    with torch.no_grad(), torch.autocast(device_type=autocast_device, enabled=device == "cuda", dtype=torch.float16):
+        outputs = model(**inputs)
+        vec = outputs.text_embeds
+
+    arr = vec.squeeze(0).detach().cpu().numpy().astype(np.float32)
+    norm = np.linalg.norm(arr)
+    if norm > 0:
+        arr /= norm
+    return arr
 
 
 def _extract_clip_embedding(image_path: Path) -> np.ndarray:
