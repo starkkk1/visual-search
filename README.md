@@ -1,37 +1,24 @@
-# Image Search System (Starter)
+# Image Search System
 
-This is an image search project that lets you:
+A visual search engine that lets you index a folder of images into vector embeddings and search for visually similar images using an interactive, modern web interface.
 
-- index a folder of images into vector embeddings
-- query with an image and retrieve the most similar images
-
-It now supports two embedding modes:
-
+It supports two embedding modes:
 - `histogram` (fast baseline)
 - `clip` (OpenAI CLIP ViT-B/32 features)
 
 ## Project Structure
 
 ```
-data/
-  images/          # put your dataset images here
-  qdrant/          # Qdrant vector database is stored here
 visual-search/
-  src/
-    config.py
-    embeddings.py
-    indexer.py
-    search.py
-    cli.py
-    api.py           # FastAPI backend
-    static/          # Web UI assets
-  requirements.txt
+  frontend/          # Next.js React web application
+  backend/           # FastAPI backend and Python AI logic
+  data/              # (Optional) Place your images in data/images
 ```
 
 ## Setup
 
-1. Activate your virtual environment.
-2. Install dependencies:
+1. Activate your Python virtual environment.
+2. Install the backend dependencies:
 
 ```bash
 pip install -r requirements.txt
@@ -39,62 +26,41 @@ pip install -r requirements.txt
 
 ## Usage
 
-### 1) Add images
-
-Put your images in `../data/images` (subfolders are supported).
-
-### 2) Build index
-
-```bash
-python -m src.cli index
+### 1. Add images
+Put your dataset images into the `data/images` directory, or specify your image path by creating a `.env` file in the root directory:
+```env
+IMAGE_SEARCH_IMAGES_DIR=D:\Path\To\Your\Images
 ```
 
-Optional:
+### 2. Build the Index (Qdrant)
+Run the indexer to process all images and load them into the local Qdrant vector database:
 
 ```bash
-python -m src.cli index --images ../data/images --method clip
+python -m backend.cli index
 ```
 
-Use the CLIP model:
+To use the **CLIP** model instead (downloads weights on first run):
+```bash
+python -m backend.cli index --method clip
+```
+
+### 3. Start the Web Interface
+Start the backend server:
 
 ```bash
-python -m src.cli index --method clip
+python -m uvicorn backend.api:app --reload
 ```
 
-### 3) Search
+Then open your browser and navigate to: **http://localhost:8000**
+You can drag and drop images into the UI to search for similar images instantly!
 
-**Standard Search:**
+### 4. Optional: CLI Search
+If you prefer searching via command line instead of the web interface:
 
 ```bash
-python -m src.cli search --query ../data/images/example.jpg --top-k 5
+python -m backend.cli search --query path/to/query_image.jpg --top-k 5
 ```
 
-Search uses the `histogram` collection by default. You can specify a different one:
-
-```bash
-python -m src.cli search --query ../data/images/example.jpg --collection clip --top-k 5
-```
-
-
-### 4) Web Interface (New)
-
-You can now search using a beautiful drag-and-drop web application.
-
-To start the backend server:
-
-```bash
-python -m uvicorn src.api:app --reload
-```
-
-Then, open your web browser and navigate to: **http://localhost:8000**
-
-## Notes
-
-- Supported extensions: `.jpg`, `.jpeg`, `.png`, `.bmp`, `.webp`
-- The index is now stored locally in a **Qdrant Vector Database**
-- Similarity is cosine similarity in range approximately `[0, 1]`
-- First run with CLIP downloads pretrained weights from the internet
-- Ongoing project changes are tracked in [CHANGELOG.md](CHANGELOG.md)
-
-- [x] Migrate index to Qdrant Vector Database
-- [ ] Store index metadata in SQLite for filtering and tags
+## Development
+- **Backend:** Powered by `FastAPI` and `Qdrant`.
+- **Frontend:** Built with `Next.js`, `TypeScript`, and `TailwindCSS v4`. When modifying frontend code, you must build and export the static files to `backend/static`.
