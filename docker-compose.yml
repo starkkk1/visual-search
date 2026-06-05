@@ -1,0 +1,52 @@
+services:
+  # Qdrant is the vector database.
+  # It stores the embeddings created during indexing and serves nearest-neighbor search.
+  qdrant:
+    image: qdrant/qdrant:v1.15.5
+    ports:
+      # 6333 = HTTP API
+      - "6333:6333"
+      # 6334 = gRPC API
+      - "6334:6334"
+    volumes:
+      # Named volume so Qdrant data survives container restarts.
+      - qdrant_storage:/qdrant/storage
+
+  # Backend serves the exported frontend, receives uploaded query images,
+  # computes embeddings, and queries Qdrant for matches.
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      # Start Qdrant before backend.
+      - qdrant
+    environment:
+      # Inside the container, app data lives under /app/data.
+      IMAGE_SEARCH_DATA_DIR: /app/data
+      # The backend reads your dataset images from this mounted folder.
+      IMAGE_SEARCH_IMAGES_DIR: /app/data/images
+      # Backend talks to the Qdrant service over the internal Docker network.
+      QDRANT_URL: http://qdrant:6333
+      # Default collection searched by the web UI.
+      # Use "clip" for CLIP embeddings or "histogram" for the simpler baseline.
+      IMAGE_SEARCH_DEFAULT_COLLECTION: ${IMAGE_SEARCH_DEFAULT_COLLECTION:-clip}
+      # Hugging Face model cache location inside the container.
+      HF_HOME: /app/.cache/huggingface
+      # 1 = print timing for each search request in backend logs.
+      LOG_SEARCH_TIMING: ${LOG_SEARCH_TIMING:-1}
+    ports:
+      # Open the web app and FastAPI on http://localhost:8000
+      - "8000:8000"
+    volumes:
+      # Mount your real image folder from the host machine into the container.
+      # :ro means read-only, which is safer for the image dataset.
+      - ./data/images:/app/data/images:ro
+      # Keep downloaded CLIP model files between runs so they are not fetched again.
+      - huggingface_cache:/app/.cache/huggingface
+
+volumes:
+  # Persistent storage for Qdrant collections and metadata.
+  qdrant_storage:
+  # Persistent storage for downloaded Hugging Face / CLIP model files.
+  huggingface_cache:

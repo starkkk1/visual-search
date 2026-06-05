@@ -45,7 +45,7 @@ def main() -> None:
         return
 
     if args.command == "search":
-        results = search_similar(
+        results, timing = search_similar(
             query_image=args.query,
             images_dir=args.images,
             collection_name=args.collection,
@@ -54,6 +54,7 @@ def main() -> None:
         print("Top results:")
         for rank, (path, score) in enumerate(results, start=1):
             print(f"{rank:>2}. score={score:.4f} path={path}")
+        print(f"Timing (ms): {timing.as_dict()}")
         return
 
     parser.print_help()

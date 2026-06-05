@@ -1,0 +1,15 @@
+services:
+  # GPU override for the backend service defined in docker-compose.yml.
+  # Use this file together with the base compose file when you want CLIP on NVIDIA GPU.
+  backend:
+    build:
+      context: .
+      # Build the CUDA-enabled backend image instead of the CPU image.
+      dockerfile: Dockerfile.gpu
+    environment:
+      # Expose all available NVIDIA GPUs to the container.
+      NVIDIA_VISIBLE_DEVICES: all
+      # Grant compute access and utility tools such as nvidia-smi.
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    # Docker should attach GPU resources to this container.
+    gpus: all

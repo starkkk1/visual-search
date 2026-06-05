@@ -5,12 +5,12 @@ import uuid
 from pathlib import Path
 
 import numpy as np
-from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, PointStruct, VectorParams
 from tqdm import tqdm
 
-from .config import QDRANT_PATH, SUPPORTED_EXTENSIONS
+from .config import QDRANT_PATH, QDRANT_URL, SUPPORTED_EXTENSIONS
 from .embeddings import EmbeddingMethod, extract_embeddings_batch, get_embedding_size
+from .qdrant import get_qdrant_client
 
 
 def _is_image(path: Path) -> bool:
@@ -36,9 +36,10 @@ def build_index(
 
     embedding_size = get_embedding_size(method)
     
-    # Initialize Qdrant Client in local mode
-    QDRANT_PATH.mkdir(parents=True, exist_ok=True)
-    client = QdrantClient(path=str(QDRANT_PATH))
+    # Embedded storage needs a local directory; remote Qdrant uses QDRANT_URL.
+    if not QDRANT_URL:
+        QDRANT_PATH.mkdir(parents=True, exist_ok=True)
+    client = get_qdrant_client()
     
     # Recreate collection
     client.recreate_collection(

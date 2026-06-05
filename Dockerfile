@@ -1,0 +1,46 @@
+# Stage 1: build the frontend into static files.
+FROM node:22-alpine AS frontend-builder
+
+WORKDIR /app/frontend
+
+# Install frontend dependencies first for better layer caching.
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+
+# Copy the frontend source and produce the exported static site.
+COPY frontend/ ./
+RUN npm run build
+
+
+# Stage 2: runtime image for the backend on CPU.
+FROM python:3.12-slim AS backend-runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    # Cache Hugging Face models inside a persistent mounted path.
+    HF_HOME=/app/.cache/huggingface
+
+WORKDIR /app
+
+# Install system libraries commonly needed by Pillow / image handling.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies for the backend.
+COPY requirements.txt ./
+RUN pip install -r requirements.txt
+
+# Copy backend source code.
+COPY backend ./backend
+# Copy exported frontend files so FastAPI can serve the UI.
+COPY --from=frontend-builder /app/frontend/out ./backend/static
+
+# Prepare folders used by bind mounts and model cache.
+RUN mkdir -p /app/data/images /app/.cache/huggingface
+
+EXPOSE 8000
+
+# Start the FastAPI app.
+CMD ["uvicorn", "backend.api:app", "--host", "0.0.0.0", "--port", "8000"]

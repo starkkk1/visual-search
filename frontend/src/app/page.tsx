@@ -10,8 +10,18 @@ interface SearchResult {
   score: number;
 }
 
+interface SearchTiming {
+  total_ms: number;
+  upload_read_ms: number;
+  temp_write_ms: number;
+  embedding_ms: number;
+  qdrant_query_ms: number;
+  result_format_ms: number;
+}
+
 export default function Home() {
   const [results, setResults] = useState<SearchResult[] | null>(null);
+  const [timing, setTiming] = useState<SearchTiming | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,6 +32,7 @@ export default function Home() {
     setLoading(true);
     setError(null);
     setResults(null);
+    setTiming(null);
 
     const formData = new FormData();
     formData.append("image", file);
@@ -34,6 +45,15 @@ export default function Home() {
 
       if (!response.ok) {
         throw new Error("Search failed");
+      }
+
+      const timingHeader = response.headers.get("x-search-timing");
+      if (timingHeader) {
+        try {
+          setTiming(JSON.parse(timingHeader) as SearchTiming);
+        } catch (parseError) {
+          console.warn("Failed to parse search timing header", parseError);
+        }
       }
 
       const data = await response.json();
@@ -100,7 +120,14 @@ export default function Home() {
       {results && (
         <div className="mt-16 w-full animate-fade-in-up">
           <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-bold text-zinc-100">Top Matches</h2>
+            <div>
+              <h2 className="text-2xl font-bold text-zinc-100">Top Matches</h2>
+              {timing && (
+                <p className="mt-2 text-sm text-zinc-400">
+                  Total {timing.total_ms.toFixed(1)} ms, embedding {timing.embedding_ms.toFixed(1)} ms, Qdrant {timing.qdrant_query_ms.toFixed(1)} ms
+                </p>
+              )}
+            </div>
             <span className="px-3 py-1 text-sm font-medium rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/20">
               {results.length} results
             </span>
