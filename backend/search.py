@@ -4,7 +4,7 @@ from pathlib import Path
 from time import perf_counter
 from typing import cast
 
-from .embeddings import EmbeddingMethod, extract_embedding
+from .embeddings import EmbeddingMethod, extract_clip_text_embedding, extract_embedding
 from .qdrant import get_qdrant_client
 from .timing import SearchTiming
 
@@ -16,8 +16,7 @@ def search_similar(
     top_k: int = 5,
 ) -> tuple[list[tuple[str, float]], SearchTiming]:
     client = get_qdrant_client()
-    
-    # We use the collection_name to determine the embedding method
+
     method = cast(EmbeddingMethod, collection_name)
     embedding_started_at = perf_counter()
     query_vec = extract_embedding(query_image, method=method)
@@ -43,3 +42,31 @@ def search_similar(
         qdrant_query_ms=qdrant_query_ms,
     )
     return results, timing
+
+
+def search_similar_by_text(
+    query_text: str,
+    images_dir: Path,
+    collection_name: str = "clip",
+    top_k: int = 5,
+) -> list[tuple[str, float]]:
+    if collection_name != "clip":
+        raise ValueError("Text search is only supported with the 'clip' collection.")
+
+    client = get_qdrant_client()
+    query_vec = extract_clip_text_embedding(query_text)
+
+    search_result = client.query_points(
+        collection_name=collection_name,
+        query=query_vec.tolist(),
+        limit=top_k,
+    )
+
+    results: list[tuple[str, float]] = []
+    for point in search_result.points:
+        if point.payload and "path" in point.payload:
+            image_rel_path = point.payload["path"]
+            image_abs_path = str(images_dir / image_rel_path)
+            results.append((image_abs_path, float(point.score)))
+
+    return results

@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .config import DEFAULT_COLLECTION, IMAGES_DIR, LOG_SEARCH_TIMING, PROJECT_ROOT
-from .search import search_similar
+from .search import search_similar, search_similar_by_text
 from .timing import SearchTiming
 
 app = FastAPI(title="Image Search API")
@@ -28,10 +28,12 @@ app.add_middleware(
 STATIC_DIR = PROJECT_ROOT / "backend" / "static"
 STATIC_DIR.mkdir(parents=True, exist_ok=True)
 
+
 class SearchResult(BaseModel):
     path: str
     url: str
     score: float
+
 
 @app.post("/search", response_model=list[SearchResult])
 async def search(response: Response, image: UploadFile = File(...)):
@@ -47,14 +49,13 @@ async def search(response: Response, image: UploadFile = File(...)):
     temp_write_ms = (perf_counter() - write_started_at) * 1000
 
     try:
-        # Using the standard search, which targets the DEFAULT_COLLECTION
         results, timing = search_similar(
             query_image=tmp_path,
             images_dir=IMAGES_DIR,
             collection_name=DEFAULT_COLLECTION,
             top_k=20,
         )
-        
+
         format_started_at = perf_counter()
         formatted_results = []
         for abs_path, score in results:
@@ -66,6 +67,7 @@ async def search(response: Response, image: UploadFile = File(...)):
                     score=score,
                 )
             )
+
         result_format_ms = (perf_counter() - format_started_at) * 1000
         full_timing = SearchTiming(
             total_ms=(perf_counter() - request_started_at) * 1000,
@@ -83,6 +85,43 @@ async def search(response: Response, image: UploadFile = File(...)):
     finally:
         if tmp_path.exists():
             os.remove(tmp_path)
+
+
+class TextSearchRequest(BaseModel):
+    query: str
+    top_k: int = 20
+
+
+@app.post("/search-text", response_model=list[SearchResult])
+async def search_text(request: TextSearchRequest):
+    try:
+        results = search_similar_by_text(
+            query_text=request.query,
+            images_dir=IMAGES_DIR,
+            collection_name=DEFAULT_COLLECTION,
+            top_k=request.top_k,
+        )
+
+        formatted_results = []
+        for abs_path, score in results:
+            rel_path = Path(abs_path).relative_to(IMAGES_DIR)
+            formatted_results.append(
+                SearchResult(
+                    path=str(rel_path),
+                    url=f"/images/{str(rel_path).replace(os.sep, '/')}",
+                    score=score,
+                )
+            )
+        return formatted_results
+    except ValueError as e:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/images", StaticFiles(directory=IMAGES_DIR), name="images")
